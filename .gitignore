@@ -1,0 +1,3 @@
+/target
+# Local secrets — never commit.
+.env

@@ -1,0 +1,286 @@
+.TH JEV\-CLI 1 "September 2026" "jev-cli 0.1.0" "User Commands"
+.SH NAME
+jev\-cli \- ask the Jev System One model probabilistic questions before acting; built for LLM agents and scripts (unofficial)
+.SH SYNOPSIS
+.B jev\-cli
+.RI [ GLOBAL\ OPTIONS ]
+.B predict
+.BI \-\-question " TEXT"
+.RI [ STATE ]
+.RI [ \-\-threshold " T" ]
+.br
+.B jev\-cli
+.RI [ GLOBAL\ OPTIONS ]
+.B choose
+.BI \-\-question " TEXT"
+.BI \-\-option " NAME[=DESC]" ...
+.RI [ STATE ]
+.RI [ \-\-min\-confidence " C" ]
+.br
+.B jev\-cli
+.RI [ GLOBAL\ OPTIONS ]
+.B score
+.BI \-\-question " TEXT"
+.BI \-\-level " TEXT" ...
+.RI [ STATE ]
+.br
+.B jev\-cli
+.RI [ GLOBAL\ OPTIONS ]
+.B ask
+.IR FILE | \-
+.br
+.B jev\-cli
+.RI [ GLOBAL\ OPTIONS ]
+.B models
+.SH DESCRIPTION
+.B jev\-cli
+evaluates typed questions against a described situation (the
+.IR state )
+using the TypeSafe AI System One API (Jev) and returns calibrated
+probabilities rather than generated text. It is designed to be called by
+LLM agents and shell scripts that need to decide
+.I before
+acting: predict the probability of an outcome, choose the best of several
+paths, or grade a situation against a rubric.
+.PP
+stdout carries only the answer (a JSON document by default); diagnostics go
+to stderr; exit codes are meaningful (see
+.BR "EXIT STATUS" ).
+This is an unofficial tool, not affiliated with TypeSafe AI.
+.SH COMMANDS
+.TP
+.BR predict " (alias: " will )
+Answer a yes/no question with the probability of \(lqyes\(rq.
+.B \-\-threshold
+.I T
+makes the command exit 1 when the probability is below
+.IR T .
+.B \-\-yes
+/
+.B \-\-no
+describe what each outcome means, sharpening calibration.
+.TP
+.BR choose " (alias: " pick )
+Pick one option among several. Each
+.B \-\-option
+is
+.I NAME
+or
+.IR NAME=DESCRIPTION ;
+at least two are required and names must be unique. The answer includes the
+chosen option, the full probability distribution, and a confidence.
+.B \-\-min\-confidence
+.I C
+makes the command exit 1 when the confidence is below
+.I C
+(the model abstains rather than guessing).
+.TP
+.BR score " (alias: " rate )
+Rate the state against ordered rubric levels given with
+.B \-\-level
+(lowest first; at least two). The answer is a probability-weighted score in
+.RI 0 .. N\-1
+that can land between levels, plus the per-level distribution and a
+confidence.
+.TP
+.B ask
+Read a full request document
+.RB { state ,
+.BR questions ,
+.RB [ model ]}
+from
+.I FILE
+(or stdin with
+.BR \- )
+and print the full response as JSON. Each question id maps to a typed
+question object:
+.BR noul
+.RB ( instructions ,
+optional
+.BR criteria
+with
+.BR true / false
+keys),
+.BR choice
+.RB ( instructions ,
+.B criteria
+map of option to description-or-null), or
+.BR score
+.RB ( instructions ,
+.B criteria
+array of level descriptions).
+.B ask
+always emits JSON; question order is preserved in the response.
+.TP
+.B models
+List the models available to the account.
+.SH GLOBAL OPTIONS
+.TP
+.BI \-\-format " json"|"text"
+Output format.
+.B json
+(default) prints a full JSON document;
+.B text
+prints only the primary answer value on one line (probability, option name,
+or score) for shell capture.
+.B ask
+always prints JSON.
+.TP
+.BI \-\-model " MODEL"
+Model to use. Default:
+.BR jev\-latest ,
+or
+.B TYPESAFE_DEFAULT_MODEL
+when set.
+.TP
+.BI \-\-env\-file " FILE"
+Load environment from
+.I FILE
+instead of
+.IR ./.env ;
+.B none
+disables loading.
+.TP
+.BI \-\-config\-file " FILE"
+Load user configuration from
+.I FILE
+instead of
+.IR ~/.jevcli/jev.conf ;
+.B none
+disables loading.
+.SH STATE INPUT
+Every question command takes the situation to evaluate via exactly one of:
+.TP
+.BI \-\-state " TEXT"
+Plain text.
+.TP
+.BI \-\-state\-json " JSON"
+A JSON value (object, array, string, ...).
+.TP
+.BI \-\-state\-file " FILE"
+Read text from
+.IR FILE ;
+.B \-
+reads stdin.
+.PP
+States and request documents are capped at 16 MiB. Empty states are
+rejected.
+.SH OUTPUT
+JSON shapes per command are documented in
+.IR docs/output.md .
+Gate fields
+.RB ( threshold ,
+.BR pass ,
+.BR min_confidence )
+are
+.B null
+when no gate was given. The
+.B model
+field echoes the resolved model version, not the requested alias.
+.B usage
+reports billed tokens.
+.SH EXIT STATUS
+.TP
+.B 0
+Success; if a gate was given, it was met.
+.TP
+.B 1
+Gate not met: probability below
+.BR \-\-threshold ,
+or confidence below
+.BR \-\-min\-confidence .
+The answer is still printed.
+.TP
+.B 2
+Usage, configuration, IO, or API error. Nothing is printed to stdout.
+.SH ENVIRONMENT
+.TP
+.B TYPESAFE_API_KEY
+API key (required).
+.TP
+.B TYPESAFE_DEFAULT_MODEL
+Model alias (default:
+.BR jev\-latest ).
+.TP
+.B TYPESAFE_BASE_URL
+API root (default:
+.BR https://api.typesafe.ai ).
+.B Never read from files
+\(em real environment only, so a planted file cannot redirect the key to
+another host.
+.SH FILES
+.TP
+.I ~/.jevcli/jev.conf
+User configuration, dotenv-style
+.IR KEY=value .
+Only
+.B TYPESAFE_API_KEY
+and
+.B TYPESAFE_DEFAULT_MODEL
+are honored. Keep it
+.BR "chmod 600" ;
+a warning is printed when group/other permission bits are set. The
+directory should be
+.BR "chmod 700" .
+.TP
+.I ./.env
+Project-local environment file; same allowlist.
+.PP
+Precedence, lowest first:
+.I ~/.jevcli/jev.conf
+<
+.I ./.env
+< real environment < CLI flags. Files only fill variables that are not
+already set.
+.SH EXAMPLES
+Gate an action on a probability:
+.PP
+.nf
+.RS
+jev\-cli predict \-\-state "$CONTEXT" \e
+    \-\-question "Is this change safe to auto\-apply?" \e
+    \-\-threshold 0.9 && ./apply.sh
+.RE
+.fi
+.PP
+Pick a path and capture the bare answer:
+.PP
+.nf
+.RS
+CHOICE=$(jev\-cli choose \-\-format text \-\-state "$CONTEXT" \e
+    \-\-question "Which approach is most likely to succeed?" \e
+    \-\-option "retry=Retry with backoff" \e
+    \-\-option "abort=Stop and ask the user")
+.RE
+.fi
+.PP
+Several typed questions in one call:
+.PP
+.nf
+.RS
+printf '%s' '{"state": "...", "questions": {
+  "ok": {"type": "noul", "instructions": "Will it work?"}
+}}' | jev\-cli ask \-
+.RE
+.fi
+.SH SECURITY
+.IP \(bu 2
+The state is sent verbatim to the TypeSafe API;
+.B jev\-cli
+does not redact secrets. Keep credentials and sensitive data out of it.
+.IP \(bu 2
+The API key is only ever sourced from the environment or the two allowlisted
+files, is marked sensitive in transport headers, and never appears in
+output, logs, or error messages.
+.IP \(bu 2
+Base URLs must be HTTPS (plain HTTP only for loopback); HTTP redirects are
+never followed, so credentials cannot leak cross-origin.
+.SH SEE ALSO
+.BR jev\-guard (1)
+\(em screening code changes with the same model.
+.IR docs/usage.md ,
+.IR docs/output.md ,
+.I AGENTS.md
+in the source distribution.
+.SH AUTHORS
+The jevelin contributors. Unofficial; not affiliated with TypeSafe AI.

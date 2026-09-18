@@ -1,0 +1,28 @@
+[package]
+name = "jev-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Unofficial agent-facing CLI for the TypeSafe AI System One API (Jev): probabilistic go/no-go and path-choice decisions for LLM agents and scripts"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/portlandhodl/jev-cli"
+keywords = ["jev", "typesafe", "llm", "agents", "decisions"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+jev-sdk = "0.1"
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tokio = { version = "1", features = [
+    "fs",
+    "io-std",
+    "io-util",
+    "macros",
+    "rt-multi-thread",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net"] }
