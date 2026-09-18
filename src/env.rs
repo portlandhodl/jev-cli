@@ -25,16 +25,29 @@ pub(crate) const ALLOWED_FILE_VARS: &[&str] = &["TYPESAFE_API_KEY", "TYPESAFE_DE
 /// Parse a dotenv-style file down to the allowlisted assignments, without
 /// touching the process environment. Pure, so tests never mutate state.
 pub(crate) fn parse_allowlisted(path: &Path) -> Result<Vec<(String, String)>, Error> {
-    let iter = dotenvy::from_path_iter(path)
-        .map_err(|e| Error::Usage(format!("cannot load {}: {e}", path.display())))?;
+    let iter = dotenvy::from_path_iter(path).map_err(|e| sanitize_dotenv_error(path, &e))?;
     let mut vars = Vec::new();
     for item in iter {
-        let (key, value) = item.map_err(|e| Error::Usage(format!("{}: {e}", path.display())))?;
+        let (key, value) = item.map_err(|e| sanitize_dotenv_error(path, &e))?;
         if ALLOWED_FILE_VARS.contains(&key.as_str()) {
             vars.push((key, value));
         }
     }
     Ok(vars)
+}
+
+/// Render a dotenvy error without echoing file contents. `LineParse`'s
+/// `Display` embeds the offending line verbatim, and these files may hold
+/// credentials — report only the line index instead.
+fn sanitize_dotenv_error(path: &Path, err: &dotenvy::Error) -> Error {
+    match err {
+        dotenvy::Error::LineParse(_, index) => Error::Usage(format!(
+            "{}: malformed line at line index {index} \
+             (line content suppressed: the file may hold credentials)",
+            path.display()
+        )),
+        other => Error::Usage(format!("cannot load {}: {other}", path.display())),
+    }
 }
 
 /// Apply assignments, never overriding the real environment. Anything in a
@@ -99,6 +112,20 @@ mod tests {
     fn explicit_missing_file_errors() {
         let result = load_env_file(Some(Path::new("/definitely/not/here.env")));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_errors_never_echo_line_content() {
+        // dotenvy's LineParse Display embeds the offending line verbatim;
+        // these files may hold credentials, so errors must carry only the
+        // line index.
+        let secret = "apikey_lonesecret_no_equals_sign";
+        let path = temp_file("broken-secret", &format!("{secret}\n"));
+        let err = load_env_file(Some(&path)).unwrap_err();
+        let msg = err.to_string();
+        assert!(!msg.contains(secret), "secret leaked into error: {msg}");
+        assert!(msg.contains("line index"), "{msg}");
+        std::fs::remove_file(path).ok();
     }
 
     #[test]

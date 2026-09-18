@@ -167,7 +167,9 @@ man -l docs/jev-cli.1               # check man page after editing it
   `~/.jevcli/jev.conf`. File loading is allowlisted to
   `TYPESAFE_API_KEY`/`TYPESAFE_DEFAULT_MODEL` — `TYPESAFE_BASE_URL` must
   never load from a file (a planted file could exfiltrate the key;
-  regression-tested). Never log or print credential values. `.env` is
+  regression-tested). Never log or print credential values — dotenvy
+  line-parse errors are sanitized to a line index because its `Display`
+  embeds the offending line verbatim (regression-tested). `.env` is
   gitignored; never commit secrets.
 - Input reads are bounded (`MAX_STATE_BYTES` / `MAX_REQUEST_BYTES`); a
   runaway stdin must error, not exhaust memory.
