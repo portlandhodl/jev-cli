@@ -32,6 +32,19 @@ stderr, and exit codes are meaningful (see below).
 
 ## Install & setup
 
+Prebuilt binaries for Linux, Windows, and macOS are attached to each
+[release](https://github.com/portlandhodl/jev-cli/releases) (built by
+`.github/workflows/release.yml`; verify with the attached `checksums.txt`):
+
+```sh
+# Linux (x86_64) example, replacing v0.0.0 with the release tag:
+curl -fsSL -o jev-cli.tar.gz \
+  https://github.com/portlandhodl/jev-cli/releases/download/v0.0.0/jev-cli-v0.0.0-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf jev-cli.tar.gz
+```
+
+Or build from source:
+
 ```sh
 cargo install --git https://github.com/portlandhodl/jev-cli
 # or: git clone https://github.com/portlandhodl/jev-cli && cd jev-cli && cargo install --path .
